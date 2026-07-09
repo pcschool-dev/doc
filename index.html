@@ -62,12 +62,9 @@
         </h4>
     </div>
     
-    <iframe style="display:none" id="link" enctype="multipart/form-data" scrolling="auto" src="https://script.google.com/a/macros/pcschool.ac.th/s/AKfycbwxP0nQxZ_w0DWUu8oxRM0d-Ke1LvFJBEg8GVQe94Jh2DNH0ZrkNMTqnzg8AvoxDaqFCA/exec"></iframe>
-    
     <script type="text/javascript">
         let preloader = document.getElementById("loading");
         let FBloading = document.getElementById("FBloading");
-        let link = document.getElementById("link");
         let idUID = window.location.search;
         let param = new URLSearchParams(idUID);
         let id = param.get('fbclid');
@@ -79,14 +76,6 @@
         }
 
         const baseAppScript = "https://script.google.com/a/macros/pcschool.ac.th/s/AKfycbwxP0nQxZ_w0DWUu8oxRM0d-Ke1LvFJBEg8GVQe94Jh2DNH0ZrkNMTqnzg8AvoxDaqFCA/exec";
-
-        // ฟังก์ชันช่วยปิด Loading แบบนิ่มนวล
-        function hideLoader() {
-            preloader.style.opacity = '0';
-            setTimeout(() => {
-                preloader.style.display = 'none';
-            }, 500);
-        }
 
         if(id){
             preloader.style.display = 'none';
@@ -107,12 +96,9 @@
         
         } else {
             let finalUrl = idApply ? getNoCacheUrl(baseAppScript, `?id=${idApply}`) : getNoCacheUrl(baseAppScript);
-            link.src = finalUrl;
-            
-            link.onload = function() {
-                hideLoader();
-                link.style.display = 'block';
-            };
+            // นำทางทั้งหน้าไปยัง Apps Script แทนการฝังใน iframe
+            // เพื่อเลี่ยงข้อจำกัด X-Frame-Options: SAMEORIGIN ของ script.google.com
+            window.location.replace(finalUrl);
         }
     </script>
 </body>    
