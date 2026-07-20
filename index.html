@@ -124,7 +124,7 @@
                 if (settled) return;
                 settled = true;
                 window.location.replace(finalUrl);
-            }, 6000); // เวลารอ iframe ก่อนตัดสินใจ fallback (มิลลิวินาที) — ปรับได้
+            }, 10000); // เวลารอ iframe ก่อนตัดสินใจ fallback (มิลลิวินาที) — ปรับได้
 
             // ใช้ iframe เป็นหลัก: ถ้าโหลดในกรอบสำเร็จ -> ยกเลิก fallback แล้วแสดงเต็มจอ
             link.onload = function () {
