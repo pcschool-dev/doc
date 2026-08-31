@@ -78,11 +78,28 @@
         let idUID = window.location.search;
         let param = new URLSearchParams(idUID);
         let id = param.get('fbclid');
-        let idApply = param.get('id');
-        
-        function getNoCacheUrl(baseUrl, params = "") {
-            let sep = baseUrl.includes('?') ? '&' : '?';
-            return baseUrl + params + sep + "t=" + new Date().getTime();
+
+        // พารามิเตอร์ที่เป็นของ "หน้าครอบ" หรือของ LINE เอง -- ไม่ต้องส่งต่อให้แอป
+        //   t                   ตัวกันแคชของหน้านี้เอง (ใส่ใหม่ทุกครั้งอยู่แล้ว)
+        //   fbclid              ตัวติดของ Facebook ใช้ตัดสินว่าจะขึ้นหน้าเตือนให้เปิดเบราว์เซอร์ภายนอก
+        //   openExternalBrowser LINE อ่านเองตอนเปิดลิงก์จากแชท แอปไม่ได้ใช้
+        const WRAPPER_ONLY = ['t', 'fbclid', 'openExternalBrowser'];
+
+        // ส่ง query ที่เหลือต่อให้ /exec ทั้งหมด
+        // จำเป็นเพราะหน้านี้ถูกใช้เป็น Callback URL ของ LINE Login ด้วย -- ขากลับจากหน้าอนุญาต
+        // ของ LINE จะมี ?code=&state= (หรือ ?error= ถ้ากดยกเลิก) ติดมา และ doGet ฝั่ง Apps Script
+        // อ่านสามตัวนี้จาก e.parameter เพื่อฝัง __LINE_BOOT__ ลงหน้า ถ้าหน้านี้ไม่ส่งต่อ
+        // การแลกโทเคนจะไม่เริ่มเลย ผู้ใช้เด้งกลับมาหน้าเข้าสู่ระบบเหมือนไม่มีอะไรเกิดขึ้น
+        // (ของเดิมส่งต่อเฉพาะ ?id= จึงทิ้ง code/state ทั้งคู่)
+        let forward = new URLSearchParams(idUID);
+        WRAPPER_ONLY.forEach(function (k) { forward.delete(k); });
+        let extra = forward.toString();
+
+        // sep ต้องคิดจาก URL ที่ต่อ query แล้ว ไม่ใช่จาก baseUrl อย่างเดียว
+        // ของเดิมคิดจาก baseUrl ล้วน เวลาเรียกพร้อม ?id=... จึงได้ ...exec?id=123?t=... มี ? สองตัว
+        function getNoCacheUrl(baseUrl, query = "") {
+            let url = baseUrl + (query ? (baseUrl.includes('?') ? '&' : '?') + query : '');
+            return url + (url.includes('?') ? '&' : '?') + "t=" + new Date().getTime();
         }
 
         const baseAppScript = "https://script.google.com/a/macros/pcschool.ac.th/s/AKfycbwxP0nQxZ_w0DWUu8oxRM0d-Ke1LvFJBEg8GVQe94Jh2DNH0ZrkNMTqnzg8AvoxDaqFCA/exec";
@@ -113,13 +130,18 @@
             }, 1000); // ทุก ๆ 1 วิ
         
         } else {
-            let finalUrl = idApply ? getNoCacheUrl(baseAppScript, `?id=${idApply}`) : getNoCacheUrl(baseAppScript);
+            let finalUrl = getNoCacheUrl(baseAppScript, extra);
 
             let settled = false;
 
             // สำรอง: ถ้าฝังใน iframe ไม่ได้ (เช่น โดน X-Frame-Options: SAMEORIGIN
             // ตอน Google เด้งไปหน้า login) onload จะไม่ยิงภายในเวลาที่กำหนด
             // -> เปลี่ยนไปเปิดลิงก์ /exec ตรง ๆ ทั้งแท็บ เพื่อให้ล็อกอิน/ใช้งานต่อได้
+            //
+            // ทางสำรองนี้พา code ไปด้วยโดยตั้งใจ: ถ้ากรอบโหลดไม่ขึ้นจริง แอปยังไม่เคยได้ code
+            // ใบนั้นจึงยังไม่ถูกใช้ ไปเปิดเต็มแท็บแล้วล็อกอินจบได้ตามปกติ
+            // กลับกัน ถ้ากรอบโหลดขึ้น การแลกโทเคนจะเริ่มหลังสคริปต์ในหน้าทำงาน ซึ่ง onload
+            // ยิงตามมาก่อนครบ 10 วินาทีอยู่แล้ว -> settled แล้ว ไม่มีทางยิง code ใบเดิมซ้ำ
             let fallbackTimer = setTimeout(function () {
                 if (settled) return;
                 settled = true;
@@ -136,6 +158,15 @@
             };
             // console.log("finalUrl",finalUrl);
             link.src = finalUrl;
+
+            // ส่งต่อให้แอปแล้ว -> ล้าง code/state ออกจากแถบที่อยู่
+            // - กดรีเฟรชแล้วไม่ยิง code ใบเดิมซ้ำ (ใบหนึ่งใช้ได้ครั้งเดียว ครั้งที่สองขึ้น
+            //   "คำขอหมดอายุหรือถูกใช้ไปแล้ว" ทั้งที่เพิ่งเข้าสำเร็จ)
+            // - ลิงก์ที่ผู้ใช้เผลอคัดลอกส่งต่อจะไม่มีรหัสติดไปด้วย
+            // ไม่แตะกรณี ?id= เพราะเป็นลิงก์เปิดหนังสือที่ควรรีเฟรชแล้วยังอยู่ที่เดิม
+            if (param.get('code') || param.get('state') || param.get('error')) {
+                try { history.replaceState(null, '', location.pathname); } catch (e) { }
+            }
 
             // ลิงก์สำรองแบบกดเอง — โผล่ขึ้นถ้ารอนานเกินไป (ตาข่ายกันพลาด
             // เผื่อบางเบราว์เซอร์ตรวจการบล็อก iframe อัตโนมัติไม่ได้)
