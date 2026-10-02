@@ -267,8 +267,8 @@
             // วาดแล้วแต่ไม่มีปุ่มจริงโผล่ใน 3 วิ (เบราว์เซอร์ที่ Google ไม่รองรับ) — สลับเป็นปุ่มสำรอง
             clearTimeout(gFbTimer);
             gFbTimer = setTimeout(function () {
-              var f = document.querySelector('#gbtn iframe');
-              if (gWant && !(f && f.getBoundingClientRect().height > 10)) gFallback('prompt');
+              // วัดความสูงของปุ่มที่ Google วาดจริง — ปุ่มเป็น div ส่วน iframe ของ Google เป็นตัวช่วยที่สูง 0 (วัด iframe = เข้าใจผิดว่าไม่มีปุ่ม)
+              if (gWant && !(document.getElementById('gbtn').getBoundingClientRect().height > 10)) gFallback('prompt');
             }, 3000);
           }
           if (!gNoAuto && !gPrompted) { gPrompted = true; google.accounts.id.prompt(); }
